@@ -3,7 +3,7 @@
 # set default shell
 SHELL=/bin/bash -o pipefail -o errexit
 
-IMG=ghcr.io/gitpod-io/gitpod-eks-guide:latest
+IMG=ghcr.io/eiymba/gitpod-eks-guide:latest
 
 # load .env file
 ifneq (,$(wildcard ./.env))
