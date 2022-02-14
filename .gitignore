@@ -9,8 +9,6 @@ cdk.out
 
 cdk.context.json
 
-package-lock.json
-
 gitpod-ingress.yaml
 .env
 
@@ -19,3 +17,5 @@ gitpod-ingress.yaml
 logs
 
 config.json
+
+cdk-outputs.json
