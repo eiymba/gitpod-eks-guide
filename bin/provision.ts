@@ -1,12 +1,8 @@
-#!/usr/bin/env node
-
-import 'source-map-support/register';
-
 import { App } from '@aws-cdk/core';
-import { ServicesStack } from '../lib/services';
-import { AddonsStack } from '../lib/addons';
-import { GitpodStack } from '../lib/gitpod';
-import { SetupStack } from '../lib/setup';
+import { ServicesStack } from '../lib/services.js';
+import { AddonsStack } from '../lib/addons.js';
+import { GitpodStack } from '../lib/gitpod.js';
+import { SetupStack } from '../lib/setup.js';
 
 const app = new App({});
 

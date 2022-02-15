@@ -5,9 +5,8 @@ import {
 } from '@aws-cdk/core';
 
 import { KubernetesManifest } from '@aws-cdk/aws-eks';
-
-import { readYamlDocument, loadYaml } from './charts/utils';
-import { importCluster } from './charts/cluster-utils';
+import { readYamlDocument, loadYaml } from './charts/utils.js';
+import { importCluster } from './charts/cluster-utils.js';
 
 export interface GitpodProps extends StackProps {
     domain: string
@@ -21,7 +20,7 @@ export class GitpodStack extends Stack {
 
         const cluster = importCluster(this, process.env.CLUSTER_NAME);
 
-        const doc = readYamlDocument(__dirname + '/charts/assets/ingress.yaml');
+        const doc = readYamlDocument(process.cwd() + '/lib/charts/assets/ingress.yaml');
         const manifest = loadYaml(doc) as any;
 
         // configure TLS termination in the load balancer

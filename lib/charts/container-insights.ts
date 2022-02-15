@@ -2,7 +2,7 @@ import * as cdk from "@aws-cdk/core";
 import * as eks from "@aws-cdk/aws-eks";
 import * as iam from '@aws-cdk/aws-iam';
 import { LogGroup, RetentionDays, ILogGroup } from '@aws-cdk/aws-logs';
-import { importCluster } from './cluster-utils';
+import { importCluster } from './cluster-utils.js';
 import { RemovalPolicy } from '@aws-cdk/core';
 import { ServiceAccount } from "@aws-cdk/aws-eks";
 import { ManagedPolicy } from '@aws-cdk/aws-iam';

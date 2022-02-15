@@ -2,8 +2,8 @@
 import * as cdk from '@aws-cdk/core'
 import * as ec2 from '@aws-cdk/aws-ec2'
 
-import { Database } from './database';
-import { Registry } from './registry';
+import { Database } from './database.js';
+import { Registry } from './registry.js';
 
 export class ServicesStack extends cdk.Stack {
     //readonly registry: Registry

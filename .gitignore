@@ -19,3 +19,5 @@ logs
 config.json
 
 cdk-outputs.json
+
+./out

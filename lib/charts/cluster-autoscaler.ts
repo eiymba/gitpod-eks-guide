@@ -1,7 +1,7 @@
 
 import { StackProps } from "@aws-cdk/core";
-import { importCluster } from './cluster-utils';
-import cdk = require('@aws-cdk/core');
+import { importCluster } from './cluster-utils.js';
+import * as cdk from '@aws-cdk/core';
 
 const CLUSTER_AUTOSCALER = 'cluster-autoscaler';
 

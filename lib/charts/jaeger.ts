@@ -1,9 +1,9 @@
 import { KubernetesManifest } from '@aws-cdk/aws-eks';
-import { loadYaml, readYamlDocument } from './utils';
+import { loadYaml, readYamlDocument } from './utils.js';
 import { StackProps } from '@aws-cdk/core';
-import { importCluster } from './cluster-utils';
-import cdk = require('@aws-cdk/core');
-import eks = require('@aws-cdk/aws-eks');
+import { importCluster } from './cluster-utils.js';
+import * as cdk from '@aws-cdk/core';
+import * as eks from '@aws-cdk/aws-eks';
 
 export class Jaeger extends cdk.Construct {
     constructor(scope: cdk.Construct, id: string, props: StackProps) {
@@ -42,7 +42,7 @@ export class Jaeger extends cdk.Construct {
             },
         });
 
-        const doc = readYamlDocument(__dirname + '/assets/jaeger-gitpod.yaml');
+        const doc = readYamlDocument(process.cwd() + '/lib/charts/assets/jaeger-gitpod.yaml');
         const gitpodJaeger = new KubernetesManifest(cluster.stack, "gitpod-jaeger", {
             cluster,
             overwrite: true,

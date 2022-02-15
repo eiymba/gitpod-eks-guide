@@ -1,9 +1,9 @@
-import cdk = require('@aws-cdk/core');
+import * as cdk from '@aws-cdk/core';
 
-import { createNamespace, readYamlDocument, loadYaml } from './utils';
+import { createNamespace, readYamlDocument, loadYaml } from './utils.js';
 import { KubernetesManifest } from '@aws-cdk/aws-eks';
-import { importCluster } from './cluster-utils';
-
+import { importCluster } from './cluster-utils.js';
+import { dirname } from 'path'
 export interface CertManagerProps extends cdk.StackProps {
     hostedZoneID?: string
 
@@ -62,7 +62,7 @@ export class CertManager extends cdk.Construct {
                 throw new Error("Unexpected error: Missing email environment variable");
             }
 
-            const doc = readYamlDocument(__dirname + '/assets/route53-issuer.yaml');
+            const doc = readYamlDocument(process.cwd() + '/lib/charts/assets/route53-issuer.yaml');
             const docArray = doc.
                 replace(/{{email}}/g, props.email).
                 replace(/{{baseDomain}}/g, props.baseDomain).

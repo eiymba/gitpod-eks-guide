@@ -1,5 +1,5 @@
-import { importCluster } from './cluster-utils';
-import cdk = require('@aws-cdk/core');
+import { importCluster } from './cluster-utils.js';
+import * as cdk from '@aws-cdk/core';
 
 const AWS_LOAD_BALANCER_CONTROLLER = 'aws-load-balancer-controller';
 

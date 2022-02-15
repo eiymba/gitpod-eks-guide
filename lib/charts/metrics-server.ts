@@ -1,6 +1,6 @@
 import * as cdk from "@aws-cdk/core";
 import { StackProps } from '@aws-cdk/core';
-import { importCluster } from './cluster-utils';
+import { importCluster } from './cluster-utils.js';
 
 export class MetricsServer extends cdk.Construct {
     constructor(scope: cdk.Construct, id: string, props: StackProps) {

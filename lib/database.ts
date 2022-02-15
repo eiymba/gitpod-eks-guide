@@ -30,6 +30,7 @@ export class Database extends cdk.Stack {
             }
         });
 
+
         // TODO: remove when the gitpod helm chart supports using secrets from ssm
         this.credentials = ssm.StringParameter.valueForStringParameter(
             this, `/gitpod/cluster/${props.clusterName}/region/${props.vpc.stack.region}`);
@@ -44,8 +45,8 @@ export class Database extends cdk.Stack {
             backupRetention: props.backupRetention ?? cdk.Duration.days(7),
             credentials: rds.Credentials.fromPassword(props.username, SecretValue.plainText(this.credentials)),
             instanceType: props.instanceType ?? ec2.InstanceType.of(
-                ec2.InstanceClass.T3,
-                ec2.InstanceSize.MEDIUM,
+                ec2.InstanceClass.T2,
+                ec2.InstanceSize.SMALL,
             ),
             allocatedStorage: 10,
             // Enable multiAz for production

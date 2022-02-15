@@ -11,10 +11,10 @@ function variables_from_context() {
 
     # extract details form the ecktl configuration file
     CLUSTER_NAME=${CLUSTER_NAME:=$(yq eval '.metadata.name' "${EKSCTL_CONFIG}")}
-    AWS_REGION=${AWS_REGION:=$(yq eval '.metadata.region' "${EKSCTL_CONFIG}")}
 
     ACCOUNT_ID=$(aws sts get-caller-identity | jq -r .Account)
-
+    AWS_REGION=${AWS_REGION:=$(aws configure get region)}
+    
     # use the default bucket?
     if [ -z "${CONTAINER_REGISTRY_BUCKET}" ]; then
         CONTAINER_REGISTRY_BUCKET="container-registry-${CLUSTER_NAME}-${ACCOUNT_ID}"
@@ -70,6 +70,11 @@ function check_prerequisites() {
     else
         echo "Using external-dns. No manual intervention required."
     fi
+    if ! [ -f "./gitpod-config.yaml" ]; then
+
+        echo "Fatal: GitHub auth credentials were not found. Be sure it exists in the current working directory."
+        exit 1
+    fi
 }
 
 # Bootstrap AWS CDK - https://docs.aws.amazon.com/cdk/latest/guide/bootstrapping.html
@@ -80,17 +85,23 @@ function ensure_aws_cdk() {
 function install() {
     check_prerequisites "$1"
     variables_from_context
+    echo accound id: "$ACCOUNT_ID"
+    echo region: "$AWS_REGION"
+    echo certificate: "$CERTIFICATE_ARN"
     ensure_aws_cdk
 
-    echo accound id: $ACCOUNT_ID
-    echo region: $AWS_REGION
-    echo certificate: $CERTIFICATE_ARN
+    yq e -i ".metadata.region = \"${AWS_REGION}\"" "${EKSCTL_CONFIG}"
+    yq e -i ".availabilityZones[0] = \"${AWS_REGION}a\"" "${EKSCTL_CONFIG}"
+    yq e -i ".availabilityZones[1] = \"${AWS_REGION}b\"" "${EKSCTL_CONFIG}"
+    yq e -i ".availabilityZones[2] = \"${AWS_REGION}c\"" "${EKSCTL_CONFIG}"
 
     # Check the certificate exists
-    if ! aws acm describe-certificate --certificate-arn "${CERTIFICATE_ARN}" --region "${AWS_REGION}" >/dev/null 2>&1; then
+    if ! ${AWS_CMD} acm describe-certificate --certificate-arn "${CERTIFICATE_ARN}" --region "${AWS_REGION}" >/dev/null 2>&1; then
         echo The secret "${CERTIFICATE_ARN}" does not exist. Command was: aws acm describe-certificate --certificate-arn "${CERTIFICATE_ARN}" --region "${AWS_REGION}"
         exit 1
     fi
+
+    local CONFIG_FILE="${DIR}/gitpod-config.yaml"
 
     if ! eksctl get cluster "${CLUSTER_NAME}" > /dev/null 2>&1; then
 
@@ -103,18 +114,36 @@ function install() {
         yq e -i ".availabilityZones[2] = ${AWS_REGION}c ${EKSCTL_CONFIG}"
 
         # https://eksctl.io/usage/managing-nodegroups/
-        eksctl create cluster --config-file ${EKSCTL_CONFIG} --without-nodegroup
+        eksctl create cluster --config-file "${EKSCTL_CONFIG}" --without-nodegroup
     else
         eksctl utils write-kubeconfig --cluster ${CLUSTER_NAME}
     fi
+
+    if ! [ -f "/gitpod/gitpod-config.yaml" ]; then
+
+        echo "No configuration found. Creating defaults."
+        gitpod-installer init > gitpod-config.yaml
+    fi
+
+    # Append user cluster settings
+
+    yq e -i ".certificate.name = \"https-certificates\"" "${CONFIG_FILE}"
+    yq e -i ".domain = \"${DOMAIN}\"" "${CONFIG_FILE}"
+    yq e -i ".database.inCluster = false" "${CONFIG_FILE}"
+    yq e -i ".database.external.certificate.kind = \"secret\"" "${CONFIG_FILE}"
+    yq e -i ".database.external.certificate.name = \"${MYSQL_GITPOD_SECRET}\"" "${CONFIG_FILE}"
+    yq e -i '.workspace.runtime.containerdRuntimeDir = "/var/lib/containerd/io.containerd.runtime.v2.task/k8s.io"' "${CONFIG_FILE}"
+    yq e -i ".containerRegistry.s3storage.bucket = \"${CONTAINER_REGISTRY_BUCKET}\"" "${CONFIG_FILE}"
+    yq e -i ".containerRegistry.s3storage.certificate.kind = \"secret\"" "${CONFIG_FILE}"
+    yq e -i ".containerRegistry.s3storage.certificate.name = \"${SECRET_STORAGE}\"" "${CONFIG_FILE}"
+    yq e -i ".workspace.runtime.fsShiftMethod = \"shiftfs\"" "${CONFIG_FILE}"
 
     # Disable default AWS CNI provider.
     # The reason for this change is related to the number of containers we can have in ec2 instances
     # https://github.com/awslabs/amazon-eks-ami/blob/master/files/eni-max-pods.txt
     # https://docs.aws.amazon.com/eks/latest/userguide/pod-networking.html
 
-    CALICO_ENABLED = kubectl get ds -n kube-system aws-node -o yaml | yq e "spec.template.spec.nodeSelector.non-calico"
-    if [ CALICO_ENABLED ]; then
+    if [ -e "$(kubectl get ds -n kube-system aws-node -o yaml | yq e \"spec.template.spec.nodeSelector.non-calico\")" ]; then
         kubectl patch ds -n kube-system aws-node -p '{"spec":{"template":{"spec":{"nodeSelector":{"non-calico": "true"}}}}}'
         # Install Calico.
         kubectl apply -f https://docs.projectcalico.org/manifests/calico-vxlan.yaml
@@ -123,17 +152,20 @@ function install() {
     fi
 
     # Create secret with container registry credentials
+    local SECRET
     if [ -n "${IMAGE_PULL_SECRET_FILE}" ] && [ -f "${IMAGE_PULL_SECRET_FILE}" ]; then
-        local SECRET = kubectl get secret generic gitpod-image-pull-secret
-        if ! [ $SECRET ]; then
+        SECRET=$(kubectl get secret generic gitpod-image-pull-secret)
+        if ! [ "$SECRET" ]; then
             kubectl create secret generic gitpod-image-pull-secret \
                 --from-file=.dockerconfigjson="${IMAGE_PULL_SECRET_FILE}" \
                 --type=kubernetes.io/dockerconfigjson  >/dev/null 2>&1 || true
         else
             echo "Image pull secret already configured. Skipping."
+        fi
     fi
 
     if ${AWS_CMD} iam get-role --role-name "${CLUSTER_NAME}-region-${AWS_REGION}-role-eksadmin" > /dev/null 2>&1; then
+        echo "EKS access already configured."
         KUBECTL_ROLE_ARN=$(${AWS_CMD} iam get-role --role-name "${CLUSTER_NAME}-region-${AWS_REGION}-role-eksadmin" | jq -r .Role.Arn)
     else
         echo "Creating Role for EKS access"
@@ -181,7 +213,7 @@ function install() {
         --region ${AWS_REGION} > /dev/null 2>&1
 
     # deploy CDK stacks
-    ./node_modules/.bin/cdk deploy \
+    npx cdk deploy \
         --context clusterName="${CLUSTER_NAME}" \
         --context region="${AWS_REGION}" \
         --context domain="${DOMAIN}" \
@@ -213,7 +245,7 @@ EOF
     echo "Create database secret..."
     kubectl create secret generic "${MYSQL_GITPOD_SECRET}" \
         --from-literal=encryptionKeys="${MYSQL_GITPOD_ENCRYPTION_KEY}" \
-        --from-literal=host=${MYSQL_GTITPOD_HOST:="$(jq -r '. | to_entries[] | select(.key | startswith("ServicesRDS")).value.MysqlEndpoint ' < cdk-outputs.json)"} \
+        --from-literal=host="${MYSQL_GTITPOD_HOST:="$(jq -r '. | to_entries[] | select(.key | startswith("ServicesRDS")).value.MysqlEndpoint ' < cdk-outputs.json)"}" \
         --from-literal=password="${MYSQL_GITPOD_PASSWORD}" \
         --from-literal=port="3306" \
         --from-literal=username="${MYSQL_GITPOD_USERNAME}" \
@@ -227,33 +259,11 @@ EOF
         --dry-run=client -o yaml | \
         kubectl replace --force -f -
 
-    echo "Applying auth provider secret..."
-    if ! [ -f "/gitpod-config.yaml"]; then
-
-        echo "Fatal: GitHub auth credentials were not found. Be sure it exists in the current working directory."
-        exit 1
-    fi
 
     kubectl create secret generic --from-file=provider=/public-github.yaml public-github -n ${NAMESPACE}
 
-
-    if ! [ -f "/gitpod/gitpod-config.yaml" ]; then
-
-        echo "No configuration found. Creating defaults."
-        gitpod-installer init > "${CONFIG_FILE}"
-
-        local CONFIG_FILE="${DIR}/gitpod-config.yaml"
-
-        yq e -i ".domain = \"${DOMAIN}\"" "${CONFIG_FILE}"
-        yq e -i ".metadata.region = \"${AWS_REGION}\"" "${CONFIG_FILE}"
-        yq e -i ".database.inCluster = false" "${CONFIG_FILE}"
-        yq e -i ".database.external.certificate.kind = \"secret\"" "${CONFIG_FILE}"
-        yq e -i ".database.external.certificate.name = \"${MYSQL_GITPOD_SECRET}\"" "${CONFIG_FILE}"
-        yq e -i ".containerRegistry.s3storage.bucket = \"${CONTAINER_REGISTRY_BUCKET}\"" "${CONFIG_FILE}"
-    fi
-
     echo Proceeding to create deployment using the following configuration:
-    echo ${CONFIG_FILE}
+    echo "${CONFIG_FILE}"
 
     gitpod-installer \
         render \
@@ -300,17 +310,17 @@ function uninstall() {
         SSM_KEY="/gitpod/cluster/${CLUSTER_NAME}/region/${AWS_REGION}"
 
         npx cdk destroy \
-            --context clusterName=${CLUSTER_NAME} \
-            --context region=${AWS_REGION} \
-            --context domain=${DOMAIN} \
-            --context certificatearn=${CERTIFICATE_ARN} \
-            --context identityoidcissuer="$(aws eks describe-cluster --name ${CLUSTER_NAME} --query "cluster.identity.oidc.issuer" --output text --region ${AWS_REGION})" \
+            --context clusterName="${CLUSTER_NAME}" \
+            --context region="${AWS_REGION}" \
+            --context domain="${DOMAIN}" \
+            --context certificatearn="${CERTIFICATE_ARN}" \
+            --context identityoidcissuer="$(aws eks describe-cluster --name "${CLUSTER_NAME}" --query "cluster.identity.oidc.issuer" --output text --region "${AWS_REGION}")" \
             --require-approval never \
             --force \
             --all \
-        && npm run cdk context --clear \
-        && eksctl delete cluster ${CLUSTER_NAME} \
-        && aws ssm delete-parameter --name ${SSM_KEY} --region ${AWS_REGION}
+        && npx cdk context --clear \
+        && eksctl delete cluster "${CLUSTER_NAME}" \
+        && aws ssm delete-parameter --name "${SSM_KEY}" --region "${AWS_REGION}"
     fi
 }
 

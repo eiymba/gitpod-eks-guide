@@ -1,13 +1,13 @@
 
 import * as cdk from '@aws-cdk/core'
 
-import { AWSLoadBalancerController } from './charts/load-balancer';
-import { MetricsServer } from './charts/metrics-server';
-import { CertManager } from './charts/cert-manager';
-import { Jaeger } from './charts/jaeger';
-import { ContainerInsights } from './charts/container-insights';
-import { ClusterAutoscaler } from './charts/cluster-autoscaler';
-import { ExternalDNS } from './charts/external-dns';
+import { AWSLoadBalancerController } from './charts/load-balancer.js';
+import { MetricsServer } from './charts/metrics-server.js';
+import { CertManager } from './charts/cert-manager.js';
+import { Jaeger } from './charts/jaeger.js';
+import { ContainerInsights } from './charts/container-insights.js';
+import { ClusterAutoscaler } from './charts/cluster-autoscaler.js';
+import { ExternalDNS } from './charts/external-dns.js';
 
 export class AddonsStack extends cdk.Stack {
 

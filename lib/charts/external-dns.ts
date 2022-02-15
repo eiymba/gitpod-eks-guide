@@ -1,7 +1,7 @@
-import cdk = require('@aws-cdk/core');
+import * as cdk from '@aws-cdk/core';
 import * as iam from '@aws-cdk/aws-iam';
-import { createNamespace } from './utils';
-import { importCluster } from './cluster-utils';
+import { createNamespace } from './utils.js';
+import { importCluster } from './cluster-utils.js';
 
 const EXTERNAL_DNS_NAMESPACE = "external-dns";
 
