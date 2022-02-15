@@ -70,11 +70,6 @@ function check_prerequisites() {
     else
         echo "Using external-dns. No manual intervention required."
     fi
-    if ! [ -f "./gitpod-config.yaml" ]; then
-
-        echo "Fatal: GitHub auth credentials were not found. Be sure it exists in the current working directory."
-        exit 1
-    fi
 }
 
 # Bootstrap AWS CDK - https://docs.aws.amazon.com/cdk/latest/guide/bootstrapping.html
@@ -259,8 +254,27 @@ EOF
         --dry-run=client -o yaml | \
         kubectl replace --force -f -
 
+    echo "Applying auth provider secret..."
+    public_github=$(cat <<EOF
+    data:
+        auth-providers.json: |
+            [{
+                "id": "Public-GitHub",
+                "host": "github.com",
+                "type": "GitHub",
+                "oauth": {
+                "clientId": "'${GITHUB_CLIENT_ID}'",
+                "clientSecret": "'${GITHUB_CLIENT_SECRET}'",
+                "callBackUrl": "https://'${DOMAIN}'/auth/github/callback",
+                "settingsUrl": "hhttps://mygithub.com/settings/applications/'${GITHUB_APPLICATION_ID}'"
+                },
+                "description": "",
+                "icon": ""
+            }]
+EOF
+)
 
-    kubectl create secret generic --from-file=provider=/public-github.yaml public-github -n ${NAMESPACE}
+    kubectl create secret generic --from-file=provider=/"${public_github}" public-github -n ${NAMESPACE}
 
     echo Proceeding to create deployment using the following configuration:
     echo "${CONFIG_FILE}"
