@@ -25,17 +25,30 @@ function variables_from_context() {
         CREATE_S3_BUCKET="true"
     fi
 
-    NODE_INSTANCE_WORKSPACE_SPOT=${NODE_INSTANCE_WORKSPACE_SPOT:="true"}
-    NODE_INSTANCE_WORKSPACE_VOLUME_SIZE=${NODE_INSTANCE_WORKSPACE_VOLUME_SIZE:="50"}
-    NODE_INSTANCE_WORKSPACE_VOLUME_TYPE=${NODE_INSTANCE_WORKSPACE_VOLUME_TYPE:="gp2"}
-    NODE_INSTANCE_WORKSPACE_IOPS=${NODE_INSTANCE_WORKSPACE_IOPS:="150"}
-    NODE_INSTANCE_WORKSPACE_TYPE=${NODE_INSTANCE_WORKSPACE_TYPE:="t3a.xlarge"}
+    NAMESPACE=${NAMESPACE:='default'}
 
-    NODE_INSTANCE_WORKSPACE_SPOT={NODE_INSTANCE_WORKSPACE_SPOT:="true"}
-    NODE_INSTANCE_SERVICES_VOLUME_SIZE={NODE_INSTANCE_SERVICES_VOLUME_SIZE:="50"}
-    NODE_INSTANCE_SERVICES_VOLUME_TYPE={NODE_INSTANCE_SERVICES_VOLUME_TYPE:="gp2"}
-    NODE_INSTANCE_SERVICES_IOPS={NODE_INSTANCE_SERVICES_IOPS:="150"}
-    NODE_INSTANCE_WORKSPACE_TYPE={NODE_INSTANCE_WORKSPACE_TYPE:="t3a.xlarge"}
+    NODE_INSTANCE_SERVICES_DESIRED_CAPACTIY=${NODE_INSTANCE_WORKSPACE_DESIRED_CAPACTIY:=1}
+    NODE_INSTANCE_SERVICES_MIN_SIZE=${NODE_INSTANCE_WORKSPACE_MIN_SIZE:=1}
+    NODE_INSTANCE_SERVICES_MAX_SIZE=${NODE_INSTANCE_WORKSPACE_MAX_SIZE:=1}
+    NODE_INSTANCE_SERVICES_SPOT=${NODE_INSTANCE_WORKSPACE_SPOT:="true"}
+    NODE_INSTANCE_SERVICES_VOLUME_SIZE=${NODE_INSTANCE_WORKSPACE_VOLUME_SIZE:="50"}
+    NODE_INSTANCE_SERVICES_VOLUME_TYPE=${NODE_INSTANCE_WORKSPACE_VOLUME_TYPE:="gp2"}
+    NODE_INSTANCE_SERVICES_IOPS=${NODE_INSTANCE_WORKSPACE_IOPS:="150"}
+    NODE_INSTANCE_SERVICES_TYPE=${NODE_INSTANCE_WORKSPACE_TYPE:="t3a.xlarge"}
+    NODE_INSTANCE_WORKSPACE_AUTOSCALER=${NODE_INSTANCE_WORKSPACE_AUTOSCALER:=false}
+    NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED=${NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED:=false}
+
+    NODE_INSTANCE_SERVICES_DESIRED_CAPACTIY=${NODE_INSTANCE_SERVICES_DESIRED_CAPACTIY:=1}
+    NODE_INSTANCE_SERVICES_MIN_SIZE=${NODE_INSTANCE_SERVICES_MIN_SIZE:=1}
+    NODE_INSTANCE_SERVICES_MAX_SIZE=${NODE_INSTANCE_SERVICES_MAX_SIZE:=1}
+    NODE_INSTANCE_SERVICES_SPOT=${NODE_INSTANCE_SERVICES_SPOT:="true"}
+    NODE_INSTANCE_SERVICES_VOLUME_SIZE=${NODE_INSTANCE_SERVICES_VOLUME_SIZE:="50"}
+    NODE_INSTANCE_SERVICES_VOLUME_TYPE=${NODE_INSTANCE_SERVICES_VOLUME_TYPE:="gp2"}
+    NODE_INSTANCE_SERVICES_IOPS=${NODE_INSTANCE_SERVICES_IOPS:="150"}
+    NODE_INSTANCE_SERVICES_TYPE=${NODE_INSTANCE_SERVICES_TYPE:="t3a.xlarge"}
+    NODE_INSTANCE_WORKSPACE_AUTOSCALER=${NODE_INSTANCE_SERVICES_AUTOSCALER:=false}
+    NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED=${NODE_INSTANCE_SERVICES_CLOUDWATCH_ENABLED:=false}
+
 
     export KUBECONFIG
     export CLUSTER_NAME
@@ -110,19 +123,12 @@ function install() {
 
     # local CONFIG_FILE="${DIR}/gitpod-config.yaml"
     local CONFIG_FILE=$(cat <<EOF
-
 apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
 metadata:
-  # Template, please change
-  # Please make sure you also update the definition of the variable
-  # CLUSTERNAME=<cluster name> in the overrideBootstrapCommand section
-  # and k8s.io/cluster-autoscaler/<cluster name>: "owned"
-  # cluster-autoscaler will not be require additional labels in a future release.
-  # https://github.com/kubernetes/autoscaler/pull/3968
-  name: '${CLUSTER_NAME}'
-  region: '${AWS_REGION}'
-  version: "1.21"
+  name: ${CLUSTER_NAME}
+  region: ${AWS_REGION}
+  version: 1.21
 
 iam:
   withOIDC: true
@@ -145,22 +151,14 @@ iam:
         autoScaler: true
 
 availabilityZones:
-  - '${AWS_REGION}a'
-  - '${AWS_REGION}b'
-  - '${AWS_REGION}c'
+  - ${AWS_REGION}a
+  - ${AWS_REGION}b
+  - ${AWS_REGION}c
 
-# By default we create a dedicated VPC for the cluster
-# You can use an existing VPC by supplying private and/or public subnets. Please check
-# https://eksctl.io/usage/vpc-networking/#use-existing-vpc-other-custom-configuration
 vpc:
   autoAllocateIPv6: false
   nat:
-    # For production environments user HighlyAvailable
-    # https://eksctl.io/usage/vpc-networking/#nat-gateway
     gateway: Single
-
-# Enable EKS control plane logging
-# https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html
 cloudWatch:
   clusterLogging:
     enableTypes: ["audit", "authenticator"]
@@ -168,24 +166,20 @@ cloudWatch:
 privateCluster:
   enabled: false
   additionalEndpointServices:
-    - "autoscaling"
-    - "logs"
+    - autoscaling
+    - logs
 
 managedNodeGroups:
   - name: workspaces
-    desiredCapacity: '${WORKSPACE_DESIRED_CAPACITY}'
-    minSize: '${WORKSPACE_MIN_SIZE}'
-    maxSize: '${WORKSPACE_MAX_SIZE}'
-    # because of AWS addons
+    desiredCapacity: ${WORKSPACE_DESIRED_CAPACITY}
+    minSize: ${WORKSPACE_MIN_SIZE}
+    maxSize: ${WORKSPACE_MAX_SIZE}
     disableIMDSv1: false
-    # Please configure the size of the volume and additional features
-    # https://eksctl.io/usage/schema/#nodeGroups-volumeType
-    # https://aws.amazon.com/es/ebs/pricing/
-    volumeSize: '${NODE_INSTANCE_WORKSPACE_VOLUME_SIZE}'
-    volumeType: '${NODE_INSTANCE_WORKSPACE_VOLUME_TYPE}'
-    volumeIOPS: '${NODE_INSTANCE_WORKSPACE_IOPS}'
-    volumeThroughput: '${NODE_INSTANCE_WORKSPACE_VOLUME_THROUGHPUT}'
-    ebsOptimized: '${NODE_INSTANCE_WORKSPACE_EBSOPTIMIZED}'
+    volumeSize: ${NODE_INSTANCE_WORKSPACE_VOLUME_SIZE}
+    volumeType: ${NODE_INSTANCE_WORKSPACE_VOLUME_TYPE}
+    volumeIOPS: ${NODE_INSTANCE_WORKSPACE_IOPS}
+    volumeThroughput: ${NODE_INSTANCE_WORKSPACE_VOLUME_THROUGHPUT}
+    ebsOptimized: ${NODE_INSTANCE_WORKSPACE_EBSOPTIMIZED}
     privateNetworking: true
     ami: ami-009935ddbb32a7f3c
 
@@ -202,69 +196,51 @@ managedNodeGroups:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
       withAddonPolicies: &withAddonPolicies
         albIngress: true
-        autoScaler: '${NODE_INSTANCE_WORKSPACE_AUTOSCALER}'
-        cloudWatch: '${NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED}'
+        autoScaler: ${NODE_INSTANCE_WORKSPACE_AUTOSCALER}
+        cloudWatch: ${NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED}
         certManager: true
         ebs: true
-    # Using custom AMI images require the definition of overrideBootstrapCommand
-    # to ensure that nodes are able to join the cluster https://eksctl.io/usage/custom-ami-support/
     overrideBootstrapCommand: |
       #!/bin/bash
 
-      export CLUSTERNAME='${CLUSTER_NAME)}'
-      export NODEGROUP=workspaces
-
       declare -a LABELS=(
-        eks.amazonaws.com/nodegroup="${NODEGROUP}"
+        eks.amazonaws.com/nodegroup="services"
         gitpod.io/workload_workspace_services=true
         gitpod.io/workload_workspace_regular=true
         gitpod.io/workload_workspace_headless=true
       )
 
       export KUBELET_EXTRA_ARGS="$(printf -- "--max-pods=110 --node-labels=%s" $(IFS=$','; echo "${LABELS[*]}"))"
-      /etc/eks/bootstrap.sh '${CLUSTER_NAME}'
+      /etc/eks/bootstrap.sh ${CLUSTER_NAME}
 
-    spot: '${NODE_INSTANCE_WORKSPACE_SPOT}'
-    # https://eksctl.io/usage/instance-selector/
+    spot: ${NODE_INSTANCE_WORKSPACE_SPOT}
     instanceSelector:
-    instanceType: '${NODE_INSTANCE_WORKSPACE_TYPE}' 
+    instanceType: ${NODE_INSTANCE_WORKSPACE_TYPE}
 
   - name: services
-    desiredCapacity: 1
-    minSize: 1
-    maxSize: 3
-    # because of AWS addons
+    desiredCapacity: ${NODE_INSTANCE_SERVICES_DESIRED_CAPACTIY}
+    minSize: ${NODE_INSTANCE_SERVICES_MIN_SIZE}
+    maxSize: ${NODE_INSTANCE_SERVICES_MAX_SIZE}
     disableIMDSv1: false
-    # Please configure the size of the volume and additional features
-    # https://eksctl.io/usage/schema/#nodeGroups-volumeType
-    # https://aws.amazon.com/es/ebs/pricing/
-    volumeSize: '${NODE_INSTANCE_SERVICES_VOLUME_SIZE}'
-    volumeType: '${NODE_INSTANCE_SERVICES_VOLUME_TYPE}'
-    volumeIOPS: '${NODE_INSTANCE_SERVICES_IOPS}'
-    volumeThroughput: '${NODE_INSTANCE_SERVICES_VOLUME_THROUGHPUT}'
-    ebsOptimized: '${NODE_INSTANCE_SERVICES_EBSOPTIMIZED}'
-    # Use private subnets for nodes
-    # https://eksctl.io/usage/vpc-networking/#use-private-subnets-for-initial-nodegroup
+    volumeSize: ${NODE_INSTANCE_SERVICES_VOLUME_SIZE}
+    volumeType: ${NODE_INSTANCE_SERVICES_VOLUME_TYPE}
+    volumeIOPS: ${NODE_INSTANCE_SERVICES_IOPS}
+    volumeThroughput: ${NODE_INSTANCE_SERVICES_VOLUME_THROUGHPUT}
+    ebsOptimized: ${NODE_INSTANCE_SERVICES_EBSOPTIMIZED}
     privateNetworking: true
     ami: ami-009935ddbb32a7f3c
 
     tags:
-      # EC2 tags required for cluster-autoscaler auto-discovery
       k8s.io/cluster-autoscaler/enabled: "true"
       k8s.io/cluster-autoscaler/gitpod: "owned"
     iam:
       attachPolicyARNs: *attachPolicyARNs
       withAddonPolicies: *withAddonPolicies
-    # Using custom AMI images require the definition of overrideBootstrapCommand
-    # to ensure that nodes are able to join the cluster https://eksctl.io/usage/custom-ami-support/
     overrideBootstrapCommand: |
       #!/bin/bash
 
-      export CLUSTERNAME='${CLUSTER_NAME}'
-      export NODEGROUP=services
-
       declare -a LABELS=(
-        eks.amazonaws.com/nodegroup="${NODEGROUP}"
+        eks.amazonaws.com/nodegroup="services"
         gitpod.io/workload_meta=true
         gitpod.io/workload_ide=true
       )
@@ -272,10 +248,10 @@ managedNodeGroups:
       export KUBELET_EXTRA_ARGS="$(printf -- "--max-pods=110 --node-labels=%s" $(IFS=$','; echo "${LABELS[*]}"))"
       /etc/eks/bootstrap.sh ${CLUSTER_NAME}
 
-    spot: '${NODE_INSTANCE_SERVICE_SPOT}'
+    spot: ${NODE_INSTANCE_SERVICES_SPOT}
     # https://eksctl.io/usage/instance-selector/
     #instanceSelector:
-    instanceType: '${NODE_INSTANCE_SERVICE_TYPE}'
+    instanceType: ${NODE_INSTANCE_SERVICES_TYPE}
 EOF
 )
 
