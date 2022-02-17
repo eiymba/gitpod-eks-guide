@@ -4,13 +4,99 @@ set -eo pipefail
 
 DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 
+function parseInstances(){
+
+  if [ "$1" -eq 0 ] && [ "$NODE_INSTANCE_WORKSPACE_TYPE" ]; then
+      echo instanceType: "${NODE_INSTANCE_WORKSPACE_TYPE}"
+
+  elif [ "$1" -eq 1 ] && [ "$NODE_INSTANCE_SERVICES_TYPE" ]; then
+      echo instanceType: "${NODE_INSTANCE_SERVICES_TYPE}"
+
+  elif [ "$1" -eq 0 ] && [ "$NODE_INSTANCE_WORKSPACE_VCPUS" ] && [ "$NODE_INSTANCE_WORKSPACE_MEMORY" ]; then
+
+      echo TODO
+
+  elif [ "$1" -eq 1 ] && [ "$NODE_INSTANCE_SERVICES_VCPUS" ] && [ "$NODE_INSTANCE_SERVICES_MEMORY" ]; then
+
+      echo TODO  
+
+  else 
+      local source=null
+      
+      case "$1" in
+            0)
+              source="${NODE_INSTANCE_WORKSPACE_TYPES}"
+              ;;
+            1)
+              source="${NODE_INSTANCE_SERVICES_TYPES}"
+              ;;
+      esac
+
+
+      IFS=$', ' read -r -a array <<< "${source}"
+      count=0
+      instanceTypes=""
+
+      for i in "${array[@]}"; do
+
+          if [ $((count + 1)) -lt ${#array[@]} ]; then 
+              instanceTypes+="\"$i\","
+          else 
+              instanceTypes+="\"$i\""
+          fi
+          ((count++))
+      
+      done
+
+      echo "instanceTypes: [${instanceTypes}]"
+  fi
+}
+
+function ami() {
+
+    case "$AWS_REGION" in
+        "")
+            echo -n "ami-009935ddbb32a7f3c"
+        ;;
+
+        us-west-1)
+            echo -n "ami-04e9afc0a981cac90"
+        ;;
+        
+        us-west-2)
+            echo -n "ami-009935ddbb32a7f3c"
+        ;;
+
+        eu-west-1)
+            echo -n "ami-0f08b4b1a4fd3ebe3"
+        ;;
+
+        eu-west-2)
+            echo -n "ami-05f027fd3d0187541"
+        ;;
+
+        eu-central-1)
+            echo -n "ami-04a8127c830f27712"
+        ;;
+
+        us-east-1)
+            echo -n "ami-076db8ca29c04327b"
+        ;;
+
+        us-east-2)
+            echo -n "ami-0ad574da759c55c17"
+        ;;
+    esac
+}
+
+
 function variables_from_context() {
     # Create EKS cluster without nodes
     # Generate a new kubeconfig file in the local directory
     KUBECONFIG=".kubeconfig"
 
     # extract details form the ecktl configuration file
-    CLUSTER_NAME=${CLUSTER_NAME:=$(yq eval '.metadata.name' "${EKSCTL_CONFIG}")}
+    CLUSTER_NAME=${CLUSTER_NAME:="gitpod"}
 
     ACCOUNT_ID=$(aws sts get-caller-identity | jq -r .Account)
     AWS_REGION=${AWS_REGION:=$(aws configure get region)}
@@ -27,27 +113,38 @@ function variables_from_context() {
 
     NAMESPACE=${NAMESPACE:='default'}
 
-    NODE_INSTANCE_SERVICES_DESIRED_CAPACTIY=${NODE_INSTANCE_WORKSPACE_DESIRED_CAPACTIY:=1}
-    NODE_INSTANCE_SERVICES_MIN_SIZE=${NODE_INSTANCE_WORKSPACE_MIN_SIZE:=1}
-    NODE_INSTANCE_SERVICES_MAX_SIZE=${NODE_INSTANCE_WORKSPACE_MAX_SIZE:=1}
-    NODE_INSTANCE_SERVICES_SPOT=${NODE_INSTANCE_WORKSPACE_SPOT:="true"}
-    NODE_INSTANCE_SERVICES_VOLUME_SIZE=${NODE_INSTANCE_WORKSPACE_VOLUME_SIZE:="50"}
-    NODE_INSTANCE_SERVICES_VOLUME_TYPE=${NODE_INSTANCE_WORKSPACE_VOLUME_TYPE:="gp2"}
-    NODE_INSTANCE_SERVICES_IOPS=${NODE_INSTANCE_WORKSPACE_IOPS:="150"}
-    NODE_INSTANCE_SERVICES_TYPE=${NODE_INSTANCE_WORKSPACE_TYPE:="t3a.xlarge"}
-    NODE_INSTANCE_WORKSPACE_AUTOSCALER=${NODE_INSTANCE_WORKSPACE_AUTOSCALER:=false}
-    NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED=${NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED:=false}
+    export NODE_INSTANCE_WORKSPACE_DESIRED_CAPACTIY=${NODE_INSTANCE_WORKSPACE_DESIRED_CAPACTIY:=1}
+    export NODE_INSTANCE_WORKSPACE_MIN_SIZE=${NODE_INSTANCE_WORKSPACE_MIN_SIZE:=1}
+    export NODE_INSTANCE_WORKSPACE_MAX_SIZE=${NODE_INSTANCE_WORKSPACE_MAX_SIZE:=10}
+    export NODE_INSTANCE_WORKSPACE_SPOT=${NODE_INSTANCE_WORKSPACE_SPOT:=false}
+    export NODE_INSTANCE_WORKSPACE_VOLUME_SIZE=${NODE_INSTANCE_WORKSPACE_VOLUME_SIZE:=300}
+    export NODE_INSTANCE_WORKSPACE_VOLUME_TYPE=${NODE_INSTANCE_WORKSPACE_VOLUME_TYPE:="gp3"}
+    export NODE_INSTANCE_WORKSPACE_IOPS=${NODE_INSTANCE_WORKSPACE_IOPS:=6000}
+    export NODE_INSTANCE_WORKSPACE_IOPS=${NODE_INSTANCE_WORKSPACE_IOPS_THROUGHPUT:=500}
+    export NODE_INSTANCE_WORKSPACE_EBSOPTIMIZED=${NODE_INSTANCE_WORKSPACE_EBSOPTIMIZED:=true}
+    export NODE_INSTANCE_WORKSPACE_TYPES=${NODE_INSTANCE_WORKSPACE_TYPES:="m6i.xlarge,m6i.2xlarge"}
+    export NODE_INSTANCE_WORKSPACE_AUTOSCALER=${NODE_INSTANCE_WORKSPACE_AUTOSCALER:=false}
+    export NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED=${NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED:=false}
+    export NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED=${NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED:=false}
 
-    NODE_INSTANCE_SERVICES_DESIRED_CAPACTIY=${NODE_INSTANCE_SERVICES_DESIRED_CAPACTIY:=1}
-    NODE_INSTANCE_SERVICES_MIN_SIZE=${NODE_INSTANCE_SERVICES_MIN_SIZE:=1}
-    NODE_INSTANCE_SERVICES_MAX_SIZE=${NODE_INSTANCE_SERVICES_MAX_SIZE:=1}
-    NODE_INSTANCE_SERVICES_SPOT=${NODE_INSTANCE_SERVICES_SPOT:="true"}
-    NODE_INSTANCE_SERVICES_VOLUME_SIZE=${NODE_INSTANCE_SERVICES_VOLUME_SIZE:="50"}
-    NODE_INSTANCE_SERVICES_VOLUME_TYPE=${NODE_INSTANCE_SERVICES_VOLUME_TYPE:="gp2"}
-    NODE_INSTANCE_SERVICES_IOPS=${NODE_INSTANCE_SERVICES_IOPS:="150"}
-    NODE_INSTANCE_SERVICES_TYPE=${NODE_INSTANCE_SERVICES_TYPE:="t3a.xlarge"}
-    NODE_INSTANCE_WORKSPACE_AUTOSCALER=${NODE_INSTANCE_SERVICES_AUTOSCALER:=false}
-    NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED=${NODE_INSTANCE_SERVICES_CLOUDWATCH_ENABLED:=false}
+    export NODE_INSTANCE_SERVICES_DESIRED_CAPACTIY=${NODE_INSTANCE_SERVICES_DESIRED_CAPACTIY:=1}
+    export NODE_INSTANCE_SERVICES_MIN_SIZE=${NODE_INSTANCE_SERVICES_MIN_SIZE:=1}
+    export NODE_INSTANCE_SERVICES_MAX_SIZE=${NODE_INSTANCE_SERVICES_MAX_SIZE:=3}
+    export NODE_INSTANCE_SERVICES_SPOT=${NODE_INSTANCE_SERVICES_SPOT:=false}
+    export NODE_INSTANCE_SERVICES_VOLUME_SIZE=${NODE_INSTANCE_SERVICES_VOLUME_SIZE:=100}
+    export NODE_INSTANCE_SERVICES_VOLUME_TYPE=${NODE_INSTANCE_SERVICES_VOLUME_TYPE:="gp3"}
+    export NODE_INSTANCE_SERVICES_IOPS=${NODE_INSTANCE_SERVICES_IOPS:=6000}
+    export NODE_INSTANCE_SERVICES_IOPS=${NODE_INSTANCE_SERVICES_IOPS_THROUGHPUT:=500}
+    export NODE_INSTANCE_SERVICES_EBSOPTIMIZED=${NODE_INSTANCE_SERVICES_EBSOPTIMIZED:=true}
+    export NODE_INSTANCE_SERVICES_TYPES=${NODE_INSTANCE_SERVICES_TYPES:="m6i.xlarge,m6i.2xlarge"}
+    export NODE_INSTANCE_SERVICES_AUTOSCALER=${NODE_INSTANCE_SERVICES_AUTOSCALER:=false}
+    export NODE_INSTANCE_SERVICES_CLOUDWATCH_ENABLED=${NODE_INSTANCE_SERVICES_CLOUDWATCH_ENABLED:=false}
+
+    export MYSQL_GITPOD_USERNAME=${MYSQL_GITPOD_USERNAME:="gitpod"}
+    export MYSQL_GITPOD_PASSWORD=${MYSQL_GITPOD_PASSWORD:=$(openssl rand -hex 18)}
+    export MYSQL_GITPOD_SECRET=${MYSQL_GITPOD_SECRET:="mysql-gitpod-token"}
+    export MYSQL_GITPOD_ENCRYPTION_KEY=${MYSQL_GITPOD_ENCRYPTION_KEY:='[{"name":"general","version":1,"primary":true,"material":"4uGh1q8y2DYryJwrVMHs0kWXJlqvHWWt/KJuNi04edI="}]'}
+    export SECRET_STORAGE=${SECRET_STORAGE:="object-storage-gitpod-token"}
 
 
     export KUBECONFIG
@@ -56,18 +153,19 @@ function variables_from_context() {
     export ACCOUNT_ID
     export CREATE_S3_BUCKET
     export CONTAINER_REGISTRY_BUCKET
+
     export NAMESPACE=${NAMESPACE:='default'}
 }
 
 function check_prerequisites() {
-    EKSCTL_CONFIG=$1
-    if [ ! -f "${EKSCTL_CONFIG}" ]; then
-        echo "The eksctl configuration file ${EKSCTL_CONFIG} does not exist."
-        exit 1
-    else
-        echo "Using eksctl configuration file: ${EKSCTL_CONFIG}"
-    fi
-    export EKSCTL_CONFIG
+
+    # if [ ! -f "${EKSCTL_CONFIG}" ]; then
+    #     echo "The eksctl configuration file ${EKSCTL_CONFIG} does not exist."
+    #     exit 1
+    # else
+    #     echo "Using eksctl configuration file: ${EKSCTL_CONFIG}"
+    # fi
+    # export EKSCTL_CONFIG
 
     if [ -z "${CERTIFICATE_ARN}" ]; then
         echo "Missing CERTIFICATE_ARN environment variable."
@@ -103,32 +201,16 @@ function ensure_aws_cdk() {
 }
 
 function install() {
-    check_prerequisites "$1"
+    check_prerequisites
     variables_from_context
-    echo accound id: "$ACCOUNT_ID"
-    echo region: "$AWS_REGION"
-    echo certificate: "$CERTIFICATE_ARN"
-    ensure_aws_cdk
-
-    yq e -i ".metadata.region = \"${AWS_REGION}\"" "${EKSCTL_CONFIG}"
-    yq e -i ".availabilityZones[0] = \"${AWS_REGION}a\"" "${EKSCTL_CONFIG}"
-    yq e -i ".availabilityZones[1] = \"${AWS_REGION}b\"" "${EKSCTL_CONFIG}"
-    yq e -i ".availabilityZones[2] = \"${AWS_REGION}c\"" "${EKSCTL_CONFIG}"
-
-    # Check the certificate exists
-    if ! ${AWS_CMD} acm describe-certificate --certificate-arn "${CERTIFICATE_ARN}" --region "${AWS_REGION}" >/dev/null 2>&1; then
-        echo The secret "${CERTIFICATE_ARN}" does not exist. Command was: aws acm describe-certificate --certificate-arn "${CERTIFICATE_ARN}" --region "${AWS_REGION}"
-        exit 1
-    fi
-
-    # local CONFIG_FILE="${DIR}/gitpod-config.yaml"
-    local CONFIG_FILE=$(cat <<EOF
+    local CONFIG
+    CONFIG=$(cat <<EOF
 apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
 metadata:
   name: ${CLUSTER_NAME}
   region: ${AWS_REGION}
-  version: 1.21
+  version: "1.21"
 
 iam:
   withOIDC: true
@@ -171,17 +253,17 @@ privateCluster:
 
 managedNodeGroups:
   - name: workspaces
-    desiredCapacity: ${WORKSPACE_DESIRED_CAPACITY}
-    minSize: ${WORKSPACE_MIN_SIZE}
-    maxSize: ${WORKSPACE_MAX_SIZE}
+    desiredCapacity: ${NODE_INSTANCE_WORKSPACE_DESIRED_CAPACTIY}
+    minSize: ${NODE_INSTANCE_WORKSPACE_MIN_SIZE}
+    maxSize: ${NODE_INSTANCE_WORKSPACE_MAX_SIZE}
     disableIMDSv1: false
     volumeSize: ${NODE_INSTANCE_WORKSPACE_VOLUME_SIZE}
     volumeType: ${NODE_INSTANCE_WORKSPACE_VOLUME_TYPE}
-    volumeIOPS: ${NODE_INSTANCE_WORKSPACE_IOPS}
-    volumeThroughput: ${NODE_INSTANCE_WORKSPACE_VOLUME_THROUGHPUT}
+    $(if [ "${NODE_INSTANCE_WORKSPACE_VOLUME_TYPE}" = "gp3" ]; then echo "volumeIOPS: ${NODE_INSTANCE_WORKSPACE_IOPS}"; fi)
+    $(if [ "${NODE_INSTANCE_WORKSPACE_VOLUME_TYPE}" = "gp3" ]; then echo "volumeThroughput: ${NODE_INSTANCE_WORKSPACE_IOPS_THROUGHPUT}"; fi)
     ebsOptimized: ${NODE_INSTANCE_WORKSPACE_EBSOPTIMIZED}
     privateNetworking: true
-    ami: ami-009935ddbb32a7f3c
+    ami: $(ami)
 
     tags:
       # EC2 tags required for cluster-autoscaler auto-discovery
@@ -204,18 +286,17 @@ managedNodeGroups:
       #!/bin/bash
 
       declare -a LABELS=(
-        eks.amazonaws.com/nodegroup="services"
+        eks.amazonaws.com/nodegroup="workspaces"
         gitpod.io/workload_workspace_services=true
         gitpod.io/workload_workspace_regular=true
         gitpod.io/workload_workspace_headless=true
       )
 
-      export KUBELET_EXTRA_ARGS="$(printf -- "--max-pods=110 --node-labels=%s" $(IFS=$','; echo "${LABELS[*]}"))"
+      export KUBELET_EXTRA_ARGS="\$(printf -- "--max-pods=110 --node-labels=%s" \$(IFS=\$','; echo "\${LABELS[*]}"))"
       /etc/eks/bootstrap.sh ${CLUSTER_NAME}
 
     spot: ${NODE_INSTANCE_WORKSPACE_SPOT}
-    instanceSelector:
-    instanceType: ${NODE_INSTANCE_WORKSPACE_TYPE}
+    $(parseInstances 0)
 
   - name: services
     desiredCapacity: ${NODE_INSTANCE_SERVICES_DESIRED_CAPACTIY}
@@ -224,11 +305,11 @@ managedNodeGroups:
     disableIMDSv1: false
     volumeSize: ${NODE_INSTANCE_SERVICES_VOLUME_SIZE}
     volumeType: ${NODE_INSTANCE_SERVICES_VOLUME_TYPE}
-    volumeIOPS: ${NODE_INSTANCE_SERVICES_IOPS}
-    volumeThroughput: ${NODE_INSTANCE_SERVICES_VOLUME_THROUGHPUT}
+    $(if [ "${NODE_INSTANCE_SERVICES_VOLUME_TYPE}" = "gp3" ]; then echo "volumeIOPS: ${NODE_INSTANCE_SERVICES_IOPS}"; fi)
+    $(if [ "${NODE_INSTANCE_SERVICES_VOLUME_TYPE}" = "gp3" ]; then echo "volumeThroughput: ${NODE_INSTANCE_SERVICES_IOPS_THROUGHPUT}"; fi)
     ebsOptimized: ${NODE_INSTANCE_SERVICES_EBSOPTIMIZED}
     privateNetworking: true
-    ami: ami-009935ddbb32a7f3c
+    ami: $(ami)
 
     tags:
       k8s.io/cluster-autoscaler/enabled: "true"
@@ -245,15 +326,29 @@ managedNodeGroups:
         gitpod.io/workload_ide=true
       )
 
-      export KUBELET_EXTRA_ARGS="$(printf -- "--max-pods=110 --node-labels=%s" $(IFS=$','; echo "${LABELS[*]}"))"
+      export KUBELET_EXTRA_ARGS="\$(printf -- "--max-pods=110 --node-labels=%s" \$(IFS=\$','; echo "\${LABELS[*]}"))"
       /etc/eks/bootstrap.sh ${CLUSTER_NAME}
 
     spot: ${NODE_INSTANCE_SERVICES_SPOT}
-    # https://eksctl.io/usage/instance-selector/
-    #instanceSelector:
-    instanceType: ${NODE_INSTANCE_SERVICES_TYPE}
+    $(parseInstances 1)
+
 EOF
 )
+    echo "$CONFIG" > ./eks-cluster.yaml
+    export EKSCTL_CONFIG="eks-cluster.yaml"
+    echo accound id: "$ACCOUNT_ID"
+    echo region: "$AWS_REGION"
+    echo certificate: "$CERTIFICATE_ARN"
+    ensure_aws_cdk
+
+    # Check the certificate exists
+    if ! ${AWS_CMD} acm describe-certificate --certificate-arn "${CERTIFICATE_ARN}" --region "${AWS_REGION}" >/dev/null 2>&1; then
+        echo The secret "${CERTIFICATE_ARN}" does not exist. Command was: aws acm describe-certificate --certificate-arn "${CERTIFICATE_ARN}" --region "${AWS_REGION}"
+        exit 1
+    fi
+    
+
+    local CONFIG_FILE="${DIR}/gitpod-config.yaml"
 
     if ! eksctl get cluster "${CLUSTER_NAME}" > /dev/null 2>&1; then
 
@@ -271,7 +366,7 @@ EOF
         eksctl utils write-kubeconfig --cluster ${CLUSTER_NAME}
     fi
 
-    if ! [ -f "/gitpod/gitpod-config.yaml" ]; then
+    if [ ! -f "${CONFIG_FILE}" ]; then
 
         echo "No configuration found. Creating defaults."
         gitpod-installer init > gitpod-config.yaml
@@ -281,6 +376,7 @@ EOF
 
     yq e -i ".certificate.name = \"https-certificates\"" "${CONFIG_FILE}"
     yq e -i ".domain = \"${DOMAIN}\"" "${CONFIG_FILE}"
+    yq e -i ".metadata.region = \"${AWS_REGION}\"" "${CONFIG_FILE}"
     yq e -i ".database.inCluster = false" "${CONFIG_FILE}"
     yq e -i ".database.external.certificate.kind = \"secret\"" "${CONFIG_FILE}"
     yq e -i ".database.external.certificate.name = \"${MYSQL_GITPOD_SECRET}\"" "${CONFIG_FILE}"
@@ -293,9 +389,11 @@ EOF
     # Disable default AWS CNI provider.
     # The reason for this change is related to the number of containers we can have in ec2 instances
     # https://github.com/awslabs/amazon-eks-ami/blob/master/files/eni-max-pods.txt
-    # https://docs.aws.amazon.com/eks/latest/userguide/pod-networking.html
+    # https://docs.aws.amazon.com/eks/latest/userguide/pod-networking.html  
+    local CALICO_ENABLED
+    CALICO_ENABLED=$(kubectl get ds -n kube-system aws-node -o yaml | yq e ".spec.template.spec.nodeSelector.non-calico" -)
 
-    if [ -e "$(kubectl get ds -n kube-system aws-node -o yaml | yq e \"spec.template.spec.nodeSelector.non-calico\")" ]; then
+    if [ "$CALICO_ENABLED" = "null" ]; then
         kubectl patch ds -n kube-system aws-node -p '{"spec":{"template":{"spec":{"nodeSelector":{"non-calico": "true"}}}}}'
         # Install Calico.
         kubectl apply -f https://docs.projectcalico.org/manifests/calico-vxlan.yaml
@@ -303,18 +401,21 @@ EOF
         echo "Calico already enabled. Skipping installation."
     fi
 
+
     # Create secret with container registry credentials
     local SECRET
-    if [ -n "${IMAGE_PULL_SECRET_FILE}" ] && [ -f "${IMAGE_PULL_SECRET_FILE}" ]; then
-        SECRET=$(kubectl get secret generic gitpod-image-pull-secret)
-        if ! [ "$SECRET" ]; then
-            kubectl create secret generic gitpod-image-pull-secret \
-                --from-file=.dockerconfigjson="${IMAGE_PULL_SECRET_FILE}" \
-                --type=kubernetes.io/dockerconfigjson  >/dev/null 2>&1 || true
-        else
-            echo "Image pull secret already configured. Skipping."
-        fi
+    SECRET=$(kubectl get secret gitpod-image-pull-secret --ignore-not-found)
+
+    if [ -n "${SECRET}" ]; then
+
+        echo "Image pull secret already configured. Skipping."
+
+    elif [ -f "${IMAGE_PULL_SECRET_FILE}" ]; then
+        kubectl create secret generic gitpod-image-pull-secret \
+            --from-file=.dockerconfigjson="${IMAGE_PULL_SECRET_FILE}" \
+            --type=kubernetes.io/dockerconfigjson  >/dev/null 2>&1 || true
     fi
+
 
     if ${AWS_CMD} iam get-role --role-name "${CLUSTER_NAME}-region-${AWS_REGION}-role-eksadmin" > /dev/null 2>&1; then
         echo "EKS access already configured."
@@ -348,12 +449,6 @@ EOF
 
     # Restart tigera-operator
     kubectl delete pod -n tigera-operator -l k8s-app=tigera-operator > /dev/null 2>&1
-
-    MYSQL_GITPOD_USERNAME=${MYSQL_GITPOD_USERNAME:="gitpod"}
-    MYSQL_GITPOD_PASSWORD=${MYSQL_GITPOD_PASSWORD:=$(openssl rand -hex 18)}
-    MYSQL_GITPOD_SECRET=${MYSQL_GITPOD_SECRET:="mysql-gitpod-token"}
-    MYSQL_GITPOD_ENCRYPTION_KEY=${MYSQL_GITPOD_ENCRYPTION_KEY:='[{"name":"general","version":1,"primary":true,"material":"4uGh1q8y2DYryJwrVMHs0kWXJlqvHWWt/KJuNi04edI="}]'}
-    SECRET_STORAGE=${SECRET_STORAGE:="object-storage-gitpod-token"}
 
     # generated password cannot excede 41 characters (RDS limitation)
     SSM_KEY="/gitpod/cluster/${CLUSTER_NAME}/region/${AWS_REGION}"
@@ -431,7 +526,9 @@ EOF
 EOF
 )
 
-    kubectl create secret generic --from-file=provider=/"${public_github}" public-github -n ${NAMESPACE}
+    echo "$public_github" > github.yaml
+
+    kubectl create secret generic --from-file=provider=./github.yaml public-github -n ${NAMESPACE}
 
     echo Proceeding to create deployment using the following configuration:
     echo "${CONFIG_FILE}"
