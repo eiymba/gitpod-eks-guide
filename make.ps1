@@ -31,7 +31,6 @@ function install {
 }
 
 Switch($args[0]){
-    # 'install' return install
     'install' { install }
     'build' { build }
 }
