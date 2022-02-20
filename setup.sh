@@ -125,7 +125,6 @@ function variables_from_context() {
     export NODE_INSTANCE_WORKSPACE_TYPES=${NODE_INSTANCE_WORKSPACE_TYPES:="m6i.xlarge,m6i.2xlarge"}
     export NODE_INSTANCE_WORKSPACE_AUTOSCALER=${NODE_INSTANCE_WORKSPACE_AUTOSCALER:=false}
     export NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED=${NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED:=false}
-    export NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED=${NODE_INSTANCE_WORKSPACE_CLOUDWATCH_ENABLED:=false}
 
     export NODE_INSTANCE_SERVICES_DESIRED_CAPACTIY=${NODE_INSTANCE_SERVICES_DESIRED_CAPACTIY:=1}
     export NODE_INSTANCE_SERVICES_MIN_SIZE=${NODE_INSTANCE_SERVICES_MIN_SIZE:=1}
@@ -528,22 +527,13 @@ EOF
     --from-file=provider=./github.yaml public-github -n ${NAMESPACE} --dry-run=client -o yaml | \
     kubectl replace --force -f -
 
-    echo "Applying S3 storage secret..."
-    s3_token=$(cat <<EOF
-        apiVersion: v1
-        kind: Secret
-        metadata:
-            name: ${S3_STORAGE_TOKEN_NAME}
-        data:
-            accessKeyId: $(echo "${S3_STORAGE_TOKEN_ACCESS_KEY_ID}" | base64 )
-            secretAccessKey: $(echo "${S3_STORAGE_TOKEN_SECRET_ACCESS_KEY}" | base64 )
-EOF
-)
-    echo "${s3_token}" > s3-token.yaml
 
-    kubectl create \
-    -f s3-token.yaml -n ${NAMESPACE} --dry-run=client -o yaml | \
-    kubectl replace --force -f -
+    echo "Create S3 storage secret..."
+    kubectl create secret generic "${S3_STORAGE_TOKEN_NAME}" \
+        --from-literal=accessKeyId="$(jq -r '. | to_entries[] | select(.key | startswith("ServicesRegistry")).value.AccessKeyId ' < cdk-outputs.json)" \
+        --from-literal=secretAccessKey="$(jq -r '. | to_entries[] | select(.key | startswith("ServicesRegistry")).value.SecretAccessKey ' < cdk-outputs.json)" \
+        --dry-run=client -o yaml | \
+        kubectl replace --force -f -
 
 
     echo Proceeding to create deployment using the following configuration:
