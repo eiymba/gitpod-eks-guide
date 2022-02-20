@@ -154,6 +154,7 @@ function variables_from_context() {
     export CREATE_S3_BUCKET
     export CONTAINER_REGISTRY_BUCKET
 
+    export S3_STORAGE_TOKEN_NAME=${S3_STORAGE_TOKEN_NAME:="s3-storage-token"}
     export NAMESPACE=${NAMESPACE:='default'}
 }
 
@@ -508,36 +509,54 @@ EOF
 
     echo "Applying auth provider secret..."
     public_github=$(cat <<EOF
-    data:
-        auth-providers.json: |
-            [{
-                "id": "Public-GitHub",
-                "host": "github.com",
-                "type": "GitHub",
-                "oauth": {
-                "clientId": "'${GITHUB_CLIENT_ID}'",
-                "clientSecret": "'${GITHUB_CLIENT_SECRET}'",
-                "callBackUrl": "https://'${DOMAIN}'/auth/github/callback",
-                "settingsUrl": "hhttps://mygithub.com/settings/applications/'${GITHUB_APPLICATION_ID}'"
-                },
-                "description": "",
-                "icon": ""
-            }]
+        id: Public-GitHub
+        host: github.com
+        type: GitHub
+        oauth: 
+            clientId: ${GITHUB_CLIENT_ID}
+            clientSecret: ${GITHUB_CLIENT_SECRET}
+            callBackUrl: https://${DOMAIN}/auth/github.com/callback
+            settingsUrl: https://mygithub.com/settings/applications/${GITHUB_APPLICATION_ID}
+        description: ""
+        icon: ""
 EOF
 )
 
-    echo "$public_github" > github.yaml
+    echo "${public_github}" > github.yaml
 
-    kubectl create secret generic --from-file=provider=./github.yaml public-github -n ${NAMESPACE}
+    kubectl create secret generic \
+    --from-file=provider=./github.yaml public-github -n ${NAMESPACE} --dry-run=client -o yaml | \
+    kubectl replace --force -f -
+
+    echo "Applying S3 storage secret..."
+    s3_token=$(cat <<EOF
+        apiVersion: v1
+        kind: Secret
+        metadata:
+            name: ${S3_STORAGE_TOKEN_NAME}
+        data:
+            accessKeyId: $(echo "${S3_STORAGE_TOKEN_ACCESS_KEY_ID}" | base64 )
+            secretAccessKey: $(echo "${S3_STORAGE_TOKEN_SECRET_ACCESS_KEY}" | base64 )
+EOF
+)
+    echo "${s3_token}" > s3-token.yaml
+
+    kubectl create \
+    -f s3-token.yaml -n ${NAMESPACE} --dry-run=client -o yaml | \
+    kubectl replace --force -f -
+
 
     echo Proceeding to create deployment using the following configuration:
-    echo "${CONFIG_FILE}"
+    cat "${CONFIG_FILE}"
+
+    # Checks that your cluster is ready to install Gitpod
+    # gitpod-installer validate cluster --kubeconfig .kubeconfig --config gitpod-config.yaml
 
     gitpod-installer \
         render \
         --config="${CONFIG_FILE}" > gitpod.yaml
     
-    
+
     kubectl apply -f gitpod.yaml -n "${NAMESPACE}"
 
     # remove shiftfs-module-loader container.
