@@ -10,26 +10,31 @@ certificate:
   name: https-certificates
 containerRegistry:
   inCluster: true
+  s3storage:
+    bucket: aethr-gitpod-object-storage
+    certificate:
+      kind: secret
+      name: object-storage-gitpod-token
 database:
   inCluster: false
   external:
     certificate:
       kind: secret
       name: mysql-gitpod-token
-domain: gitpod.example.com
+domain: gitpod.aethr.cloud
 imagePullSecrets: null
 jaegerOperator:
   inCluster: true
 kind: Full
 metadata:
-  region: local
+  region: eu-west-2
 objectStorage:
   inCluster: false
   s3:
     endpoint: s3.amazonaws.com
     credentials:
       kind: secret
-      name: object-storage-gitpod-token
+      name: s3-storage-token
 observability:
   logLevel: info
 repository: eu.gcr.io/gitpod-core-dev/build
@@ -39,6 +44,6 @@ workspace:
       cpu: "1"
       memory: 2Gi
   runtime:
-    containerdRuntimeDir: /run/containerd/io.containerd.runtime.v2.task/k8s.io
+    containerdRuntimeDir: /var/lib/containerd/io.containerd.runtime.v2.task/k8s.io
     containerdSocket: /run/containerd/containerd.sock
-    fsShiftMethod: fuse
+    fsShiftMethod: shiftfs

@@ -1,15 +1,8 @@
 apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
 metadata:
-  # Template, please change
-  # Please make sure you also update the definition of the variable
-  # CLUSTERNAME=<cluster name> in the overrideBootstrapCommand section
-  # and k8s.io/cluster-autoscaler/<cluster name>: "owned"
-  # cluster-autoscaler will not be require additional labels in a future release.
-  # https://github.com/kubernetes/autoscaler/pull/3968
   name: gitpod
-  # Template, please change
-  region: us-west-2
+  region: eu-west-2
   version: "1.21"
 
 iam:
@@ -33,22 +26,14 @@ iam:
         autoScaler: true
 
 availabilityZones:
-  - us-west-2a
-  - us-west-2b
-  - us-west-2c
+  - eu-west-2a
+  - eu-west-2b
+  - eu-west-2c
 
-# By default we create a dedicated VPC for the cluster
-# You can use an existing VPC by supplying private and/or public subnets. Please check
-# https://eksctl.io/usage/vpc-networking/#use-existing-vpc-other-custom-configuration
 vpc:
   autoAllocateIPv6: false
   nat:
-    # For production environments user HighlyAvailable
-    # https://eksctl.io/usage/vpc-networking/#nat-gateway
     gateway: Single
-
-# Enable EKS control plane logging
-# https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html
 cloudWatch:
   clusterLogging:
     enableTypes: ["audit", "authenticator"]
@@ -56,28 +41,22 @@ cloudWatch:
 privateCluster:
   enabled: false
   additionalEndpointServices:
-    - "autoscaling"
-    - "logs"
+    - autoscaling
+    - logs
 
 managedNodeGroups:
   - name: workspaces
     desiredCapacity: 1
     minSize: 1
-    maxSize: 10
-    # because of AWS addons
+    maxSize: 1
     disableIMDSv1: false
-    # Please configure the size of the volume and additional features
-    # https://eksctl.io/usage/schema/#nodeGroups-volumeType
-    # https://aws.amazon.com/es/ebs/pricing/
-    volumeSize: 300
-    volumeType: gp3
-    volumeIOPS: 6000
-    volumeThroughput: 500
+    volumeSize: 50
+    volumeType: "gp2"
+    
+    
     ebsOptimized: true
-    # Use private subnets for nodes
-    # https://eksctl.io/usage/vpc-networking/#use-private-subnets-for-initial-nodegroup
     privateNetworking: true
-    ami: ami-009935ddbb32a7f3c
+    ami: ami-05f027fd3d0187541
 
     tags:
       # EC2 tags required for cluster-autoscaler auto-discovery
@@ -92,83 +71,56 @@ managedNodeGroups:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
       withAddonPolicies: &withAddonPolicies
         albIngress: true
-        autoScaler: true
-        cloudWatch: true
+        autoScaler: false
+        cloudWatch: false
         certManager: true
         ebs: true
-    # Using custom AMI images require the definition of overrideBootstrapCommand
-    # to ensure that nodes are able to join the cluster https://eksctl.io/usage/custom-ami-support/
     overrideBootstrapCommand: |
       #!/bin/bash
 
-      export CLUSTERNAME=gitpod
-      export NODEGROUP=workspaces
-
       declare -a LABELS=(
-        eks.amazonaws.com/nodegroup="${NODEGROUP}"
+        eks.amazonaws.com/nodegroup="workspaces"
         gitpod.io/workload_workspace_services=true
         gitpod.io/workload_workspace_regular=true
         gitpod.io/workload_workspace_headless=true
       )
 
       export KUBELET_EXTRA_ARGS="$(printf -- "--max-pods=110 --node-labels=%s" $(IFS=$','; echo "${LABELS[*]}"))"
-      /etc/eks/bootstrap.sh ${CLUSTERNAME}
+      /etc/eks/bootstrap.sh gitpod
 
-    spot: false
-    # https://eksctl.io/usage/instance-selector/
-    #instanceSelector:
-    #  vCPUs: 8
-    #  memory: 64Gib
-    # or use a custom list
-    instanceTypes: ["m6i.xlarge", "m6i.2xlarge"]
+    spot: true
+    instanceType: "t3a.xlarge"
 
   - name: services
     desiredCapacity: 1
     minSize: 1
-    maxSize: 3
-    # because of AWS addons
+    maxSize: 1
     disableIMDSv1: false
-    # Please configure the size of the volume and additional features
-    # https://eksctl.io/usage/schema/#nodeGroups-volumeType
-    # https://aws.amazon.com/es/ebs/pricing/
-    volumeSize: 100
-    volumeType: gp3
-    volumeIOPS: 6000
-    volumeThroughput: 500
+    volumeSize: 50
+    volumeType: "gp2"
+    
+    
     ebsOptimized: true
-    # Use private subnets for nodes
-    # https://eksctl.io/usage/vpc-networking/#use-private-subnets-for-initial-nodegroup
     privateNetworking: true
-    ami: ami-009935ddbb32a7f3c
+    ami: ami-05f027fd3d0187541
 
     tags:
-      # EC2 tags required for cluster-autoscaler auto-discovery
       k8s.io/cluster-autoscaler/enabled: "true"
       k8s.io/cluster-autoscaler/gitpod: "owned"
     iam:
       attachPolicyARNs: *attachPolicyARNs
       withAddonPolicies: *withAddonPolicies
-    # Using custom AMI images require the definition of overrideBootstrapCommand
-    # to ensure that nodes are able to join the cluster https://eksctl.io/usage/custom-ami-support/
     overrideBootstrapCommand: |
       #!/bin/bash
 
-      export CLUSTERNAME=gitpod
-      export NODEGROUP=services
-
       declare -a LABELS=(
-        eks.amazonaws.com/nodegroup="${NODEGROUP}"
+        eks.amazonaws.com/nodegroup="services"
         gitpod.io/workload_meta=true
         gitpod.io/workload_ide=true
       )
 
       export KUBELET_EXTRA_ARGS="$(printf -- "--max-pods=110 --node-labels=%s" $(IFS=$','; echo "${LABELS[*]}"))"
-      /etc/eks/bootstrap.sh ${CLUSTERNAME}
+      /etc/eks/bootstrap.sh gitpod
 
-    spot: false
-    # https://eksctl.io/usage/instance-selector/
-    #instanceSelector:
-    #  vCPUs: 4
-    #  memory: 16Gib
-    # or use a custom list
-    instanceTypes: ["m6i.xlarge", "m6i.2xlarge"]
+    spot: true
+    instanceType: "t3a.xlarge"

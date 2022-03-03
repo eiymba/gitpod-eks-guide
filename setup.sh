@@ -658,7 +658,7 @@ function auth() {
     fi
 
     # Patching the configuration with the user auth provider/s
-    kubectl --kubeconfig .kubeconfig patch configmap auth-providers-config --type merge --patch "$(cat ${AUTHPROVIDERS_CONFIG})"
+    kubectl --kubeconfig .kubeconfig patch secret auth-providers-config --type merge --patch "$(cat ${AUTHPROVIDERS_CONFIG})"
     # Restart the server component
     kubectl --kubeconfig .kubeconfig rollout restart deployment/server
 }
