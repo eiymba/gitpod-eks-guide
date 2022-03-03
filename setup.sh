@@ -506,7 +506,9 @@ EOF
         --dry-run=client -o yaml | \
         kubectl replace --force -f -
 
-    echo "Applying auth provider secret..."
+    if [[ -n "${GITHUB_CLIENT_ID}" ]] && [[ -n "${GITHUB_CLIENT_SECRET}" ]]; then
+
+    echo "Applying GitHub auth provider secret..."
     public_github=$(cat <<EOF
         id: Public-GitHub
         host: github.com
@@ -526,6 +528,31 @@ EOF
     kubectl create secret generic \
     --from-file=provider=./github.yaml public-github -n ${NAMESPACE} --dry-run=client -o yaml | \
     kubectl replace --force -f -
+
+    fi
+
+    if [[ -n "${GITLAB_CLIENT_ID}" ]] && [[ -n "${GITLAB_CLIENT_SECRET}" ]]; then
+
+    echo "Applying GitLab auth provider secret..."
+    public_gitlab=$(cat <<EOF
+        id: Public-GitLab
+        host: gitlab.com
+        type: GitLab
+        oauth: 
+            clientId: ${GITLAB_CLIENT_ID}
+            clientSecret: ${GITLAB_CLIENT_SECRET}
+            callBackUrl: https://${DOMAIN}/auth/gitlab.com/callback
+        description: ""
+        icon: ""
+EOF
+)
+    echo "${public_gitlab}" > gitlab.yaml
+
+    kubectl create secret generic \
+    --from-file=provider=./gitlab.yaml public-gitlab -n ${NAMESPACE} --dry-run=client -o yaml | \
+    kubectl replace --force -f -
+
+    fi
 
 
     echo "Create S3 storage secret..."
