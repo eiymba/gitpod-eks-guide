@@ -1,6 +1,6 @@
 FROM ubuntu:latest AS curl
 
-ARG GITPOD_VERSION="2022.01"
+ARG GITPOD_VERSION="2022.02.0"
 
 RUN apt-get update; apt-get install curl -y
 
