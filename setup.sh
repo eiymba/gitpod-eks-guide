@@ -435,7 +435,7 @@ EOF
 
     # check if the identity mapping already exists
     # Manage IAM users and roles https://eksctl.io/usage/iam-identity-mappings/
-    if ! eksctl get iamidentitymapping --cluster ${CLUSTER_NAME} --arn ${KUBECTL_ROLE_ARN} > /dev/null 2>&1; then
+    if ! eksctl get iamidentitymapping --cluster ${CLUSTER_NAME} --arn "${KUBECTL_ROLE_ARN}" > /dev/null 2>&1; then
         echo "Creating mapping from IAM role ${KUBECTL_ROLE_ARN}"
         eksctl create iamidentitymapping \
             --cluster "${CLUSTER_NAME}" \
@@ -454,10 +454,10 @@ EOF
     SSM_KEY="/gitpod/cluster/${CLUSTER_NAME}/region/${AWS_REGION}"
     aws ssm put-parameter \
         --overwrite \
-        --name ${SSM_KEY} \
+        --name "${SSM_KEY}" \
         --type String \
-        --value ${MYSQL_GITPOD_PASSWORD} \
-        --region ${AWS_REGION} > /dev/null 2>&1
+        --value "${MYSQL_GITPOD_PASSWORD}" \
+        --region "${AWS_REGION}" > /dev/null 2>&1
 
     # deploy CDK stacks
     npx cdk deploy \
@@ -470,7 +470,7 @@ EOF
         --outputs-file cdk-outputs.json \
         --all
 
-    TLS termination is done in the ALB.
+    # TLS termination is done in the ALB.
     cat <<EOF | kubectl apply -f -
 apiVersion: cert-manager.io/v1
 kind: Certificate
