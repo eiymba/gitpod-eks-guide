@@ -603,29 +603,49 @@ function uninstall() {
     variables_from_context
 
     read -p "Are you sure you want to delete: Gitpod, Services/Registry, Services/RDS, Services, Addons, Setup (y/n)? " -n 1 -r
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        if ! aws eks describe-cluster --name "${CLUSTER_NAME}" --region "${AWS_REGION}" > /dev/null; then
-            exit 1
-        fi
-
-        KUBECTL_ROLE_ARN=$(aws iam get-role --role-name "${CLUSTER_NAME}-region-${AWS_REGION}-role-eksadmin" | jq -r .Role.Arn)
-        export KUBECTL_ROLE_ARN
-
-        SSM_KEY="/gitpod/cluster/${CLUSTER_NAME}/region/${AWS_REGION}"
-
-        npx cdk destroy \
-            --context clusterName="${CLUSTER_NAME}" \
-            --context region="${AWS_REGION}" \
-            --context domain="${DOMAIN}" \
-            --context certificatearn="${CERTIFICATE_ARN}" \
-            --context identityoidcissuer="$(aws eks describe-cluster --name "${CLUSTER_NAME}" --query "cluster.identity.oidc.issuer" --output text --region "${AWS_REGION}")" \
-            --require-approval never \
-            --force \
-            --all \
-        && npx cdk context --clear \
-        && eksctl delete cluster "${CLUSTER_NAME}" \
-        && aws ssm delete-parameter --name "${SSM_KEY}" --region "${AWS_REGION}"
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        echo 'Uninstallation cancelled.'
+        exit 0
     fi
+
+    if ! aws eks describe-cluster --name "${CLUSTER_NAME}" --region "${AWS_REGION}" > /dev/null; then
+        echo "Error: Cluster \"${CLUSTER_NAME}\" could not be found. Are you using the correct region and account?"
+        echo "Aborting uninstallation."
+        exit 1
+    fi
+
+    KUBECTL_ROLE_ARN=$(aws iam get-role --role-name "${CLUSTER_NAME}-region-${AWS_REGION}-role-eksadmin" | jq -r .Role.Arn)
+    export KUBECTL_ROLE_ARN
+
+    SSM_KEY="/gitpod/cluster/${CLUSTER_NAME}/region/${AWS_REGION}"
+
+    npx cdk destroy \
+        --context clusterName="${CLUSTER_NAME}" \
+        --context region="${AWS_REGION}" \
+        --context domain="${DOMAIN}" \
+        --context certificatearn="${CERTIFICATE_ARN}" \
+        --context identityoidcissuer="$(aws eks describe-cluster --name "${CLUSTER_NAME}" --query "cluster.identity.oidc.issuer" --output text --region "${AWS_REGION}")" \
+        --require-approval never \
+        --force \
+        --all \
+    && npx cdk context --clear \
+    && eksctl delete cluster "${CLUSTER_NAME}" \
+    && aws ssm delete-parameter --name "${SSM_KEY}" --region "${AWS_REGION}"
+
+    # delete s3 buckets
+    aws s3 rm "s3://${CONTAINER_REGISTRY_BUCKET}" --recursive
+
+    IFS=$'\n' read -r -a buckets <<< "$(aws s3 ls)"
+
+    for bucket in "${buckets[@]}"; do
+
+        if [[ "${bucket}" == *"gitpod-user"* ]]; then
+            aws s3 rm "${bucket}" --recursive
+        fi
+    done
+
+    echo "done."
+
 }
 
 function auth() {
