@@ -38,8 +38,21 @@ function uninstall {
 
 }
 
+function auth {
+    echo "Installing auth providers...."
+    DOCKER_RUN_CMD("--auth")
+}
+
+function help {
+    echo 'Usage: ./make.ps1 build|install|uninstall|auth'
+}
+
 Switch($args[0]){
     'install' { install }
     'build' { build }
     'uninstall' { uninstall }
+    'help' { help }
 }
+
+help
+
