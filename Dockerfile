@@ -1,16 +1,6 @@
 FROM byrnedo/alpine-curl:latest AS curl
 
-COPY --from=curl /usr/local/bin/yq /usr/local/bim/yq
-RUN chmod +x /usr/local/bim/yq
-COPY --from=curl /usr/local/bin/eksctl /usr/local/bin/eksctl
-RUN chmod +x /usr/local/bin/eksctl
-COPY --from=curl /usr/local/bin/kubectl /usr/local/bin/kubectl
-RUN chmod +x /usr/local/bin/kubectl
-COPY --from=curl /usr/local/bin/aws-iam-authenticator /usr/local/bin/aws-iam-authenticator
-RUN chmod +x /usr/local/bin/aws-iam-authenticator
-COPY --from=curl /usr/local/bin/gitpod-installer /usr/local/bin/gitpod-installer
-RUN chmod +x /usr/local/bin/gitpod-installer
-
+ARG GITPOD_VERSION="2022.02.0"
 
 RUN curl -fsSL https://github.com/mikefarah/yq/releases/download/v4.12.0/yq_linux_amd64 -o /usr/local/bin/yq 
 
